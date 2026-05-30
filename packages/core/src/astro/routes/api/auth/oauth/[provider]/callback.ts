@@ -128,8 +128,14 @@ export const GET: APIRoute = async ({ params, request, locals, session, redirect
 			env = runtimeLocals.runtime?.env ?? (import.meta.env as Record<string, unknown>);
 		} catch {
 			// Astro v6: locals.runtime.env accessor throws — import from cloudflare:workers instead.
+			// The module id is held in a variable so Rollup cannot statically resolve it: in the
+			// Node template builds the specifier does not exist, and a literal import would fail
+			// the build. It resolves at runtime only on Cloudflare Workers.
 			try {
-				const { env: cfEnv } = await import("cloudflare:workers");
+				// Built at runtime (not a string literal) so neither this package's bundler nor
+				// the downstream Astro/Rollup template build statically resolves "cloudflare:workers".
+				const cfWorkersModId = ["cloudflare", "workers"].join(":");
+				const { env: cfEnv } = await import(/* @vite-ignore */ cfWorkersModId);
 				// eslint-disable-next-line typescript/no-unsafe-type-assertion -- cloudflare:workers env is typed as Cloudflare.Env; cast to generic record for getOAuthConfig
 				env = cfEnv as Record<string, unknown>;
 			} catch {
